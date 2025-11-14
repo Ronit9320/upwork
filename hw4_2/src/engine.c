@@ -68,9 +68,6 @@ fprintf(stderr, "[engine] engine starts\n"); //ming
     /* Make stdout line-buffered so each line flushes to the parent immediately. */
     setvbuf(stdout, NULL, _IOLBF, 0);
 
-    fputs("ready\n", stdout);
-    fflush(stdout);
-    
     char line[256];
 
     for (;;) {
@@ -124,20 +121,10 @@ fprintf(stderr, "[engine] line 87\n"); //ming
             }
 
             /* Emit EXACTLY ONE line to stdout */
-            print_move(bp, best, stdout);   /* prints "<move>\n" */
-            fflush(stdout);                  /* make sure it leaves the pipe now */
+            print_move(bp, best, stdout);   /* prints "<move>" */
+            fprintf(stdout, "\n");          /* add the required newline */
+            fflush(stdout);                 /* make sure it leaves the pipe now */
 
-///* Optional mirror to stderr for debugging (do not write to stdout twice) */
-//{  // ming
-//    char mvbuf[128];
-//    FILE *mem = fmemopen(mvbuf, sizeof mvbuf, "w");
-//    if (mem) {
-//        print_move(bp, best, mem);
-//        fflush(mem);
-//        fclose(mem);
-//        fprintf(stderr, "[engine move] %s\n", mvbuf);  /* note: stderr */
-//    }
-//}
             apply(bp, best);
             fprintf(stderr, "[engine] played.\n");
             continue;

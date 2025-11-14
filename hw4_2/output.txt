@@ -1,0 +1,8 @@
+[engine] engine starts
+[ccheck] entering main game loop
+[ccheck] line 361
+[ccheck] about to read from engine pipe...
+[engine] got control: <
+[engine] searching (iterative deepening)...
+[engine] about to send: 'white:A3-C3'[engine] sent and flushed
+[engine] played.

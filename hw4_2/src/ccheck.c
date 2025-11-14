@@ -238,11 +238,8 @@ static void spawn_engine_if_needed(const Config *cfg, Board *bp) {
     g_eng_in  = fdopen_checked(to_eng[1], "w");   // parent -> engine stdin
     g_eng_out = fdopen_checked(from_eng[0], "r"); // parent <- engine stdout
 
-    // Wait for single "ready" line from engine to prevent race condition on SIGHUP.
-    char ready[256];
-    if (!read_line(g_eng_out, ready, sizeof(ready)) || strcmp(ready, "ready\n") != 0) {
-        die("engine failed to signal readiness");
-    }
+    // Some engine implementations may emit a ready line; the spec doesn't require it.
+    // We won't block here—parent proceeds immediately.
 }
 
 // ======= Argument parsing =======
@@ -352,7 +349,7 @@ static Move request_move_from_engine(Board *bp) {
     if (g_eng_pid <= 0) die("engine requested but no engine child");
     if (fputs("<\n", g_eng_in) == EOF) die("engine write < failed");
     if (fflush(g_eng_in) == EOF) die("engine flush failed");
-    if (kill(g_eng_pid, SIGHUP) < 0) die("engine SIGHUP: %s", strerror(errno));
+    //    if (kill(g_eng_pid, SIGHUP) < 0) die("engine SIGHUP: %s", strerror(errno));
     // Read exactly one move line from engine and validate using the helper
 
 //int c;  //ming
