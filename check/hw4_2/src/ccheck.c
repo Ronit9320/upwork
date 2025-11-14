@@ -402,20 +402,17 @@ static void load_history_if_any(Board *bp, const Config *cfg) {
     apply(bp, m);
     // Minimal transcript of history (optional): you can enhance if needed.
     if (g_tx) {
-      int ply = move_number(bp) - 1; // just applied
-      int turn = (ply / 2) + 1;
-      const char *side = (p == X) ? "white" : "black";
-      char mv[128];
-      FILE *mem = fmemopen(mv, sizeof(mv), "w");
-      if (!mem)
-        die("fmemopen: %s", strerror(errno));
-      print_move(bp, m, mem);
-      fflush(mem);
-      fclose(mem);
-      if (p == X)
-        fprintf(g_tx, "%d. %s:%s", turn, side, mv);
-      else
-        fprintf(g_tx, "%d. ... %s:%s", turn, side, mv);
+            int ply = move_number(bp) - 1; // just applied
+            int turn = (ply / 2) + 1;
+            char mv[128];
+            FILE *mem = fmemopen(mv, sizeof(mv), "w");
+            if (!mem)
+              die("fmemopen: %s", strerror(errno));
+            print_move(bp, m, mem);
+            fflush(mem);
+            fclose(mem);
+            if (p == X) fprintf(g_tx, "%d. %s", turn, mv);
+            else        fprintf(g_tx, "%d. ... %s", turn, mv);
       fflush(g_tx);
     }
   }
@@ -429,10 +426,8 @@ static void notify_engine_of_opponent_move(Board *bp, Player mover,
     return;
   bool engine_is_white = cfg->play_white_engine;
   bool engine_is_black = cfg->play_black_engine;
-  bool mover_is_opponent =
-      (mover == X && engine_is_black) || (mover == O && engine_is_white);
-  if (!mover_is_opponent)
-    return;
+  bool mover_is_engine = (mover == X && engine_is_white) || (mover == O && engine_is_black);
+  if (mover_is_engine) return;  // Don't notify engine of its own moves
 
   char mvbuf[128];
   FILE *mem = fmemopen(mvbuf, sizeof(mvbuf), "w");
@@ -511,7 +506,6 @@ static void write_transcript_move(Board *bp, Player p, Move m) {
     return;
   int ply_before_apply = move_number(bp); // pending ply index
   int turn = (ply_before_apply / 2) + 1;
-  const char *side = (p == X) ? "white" : "black";
   char mv[128];
   FILE *mem = fmemopen(mv, sizeof(mv), "w");
   if (!mem)
@@ -520,9 +514,9 @@ static void write_transcript_move(Board *bp, Player p, Move m) {
   fflush(mem);
   fclose(mem);
   if (p == X)
-    fprintf(g_tx, "%d. %s:%s", turn, side, mv);
+    fprintf(g_tx, "%d. %s", turn, mv);
   else
-    fprintf(g_tx, "%d. ... %s:%s", turn, side, mv);
+    fprintf(g_tx, "%d. ... %s", turn, mv);
   fflush(g_tx);
 }
 
@@ -531,6 +525,7 @@ static void game_loop(Board *bp, const Config *cfg) {
   info("entering main game loop");
 
   for (;;) {
+    fprintf(stderr, "[ccheck] === NEW TURN ===\n");
     if (g_got_sigint || g_got_sigterm) {
       info("termination requested");
       break;
@@ -544,6 +539,7 @@ static void game_loop(Board *bp, const Config *cfg) {
 
     // Check game end
     int ended = game_over(bp);
+    fprintf(stderr, "[ccheck] game_over result: %d\n", ended);
     if (ended != 0) {
       if (ended == 1)
         fprintf(stdout, "X (white) wins!");
@@ -556,11 +552,15 @@ static void game_loop(Board *bp, const Config *cfg) {
     Player p = player_to_move(bp);
     bool p_is_engine =
         (p == X) ? cfg->play_white_engine : cfg->play_black_engine;
+    fprintf(stderr, "[ccheck] player to move: %d, is_engine: %d\n", p,
+            p_is_engine);
 
     // Acquire move according to mode
     Move m = 0;
     bool came_from_display = false;
 
+    fprintf(stderr, "[ccheck] about to request move, p_is_engine=%d\n",
+            p_is_engine);
     if (p_is_engine) {
 
       m = request_move_from_engine(bp);
@@ -614,16 +614,18 @@ static void game_loop(Board *bp, const Config *cfg) {
 
       /* Wait for the display's ack to ensure it processed the move */
       char ack[16];
+      fprintf(stderr, "[ccheck] waiting for xdisp ack...\n");
       if (!fgets(ack, sizeof ack, g_disp_out) || strcmp(ack, "ok\n") != 0) {
-        die("display ack failed");
+          fprintf(stderr, "[ccheck] got ack: '%s'\n", ack);
+          die("display ack failed");
       }
-      fprintf(stderr, "[xdisp -> ccheck] %s", ack); // ming
+      fprintf(stderr, "[ccheck] got ack: '%s'\n", ack);
     }
 
     // If in tournament mode and the mover was the ENGINE, print @@@-prefixed
     // line
     if (cfg->tournament_mode && p_is_engine) {
-      const char *side = (p == X) ? "white" : "black";
+
       char mv[128];
       FILE *mem = fmemopen(mv, sizeof(mv), "w");
       if (!mem)
@@ -631,7 +633,7 @@ static void game_loop(Board *bp, const Config *cfg) {
       print_move(bp, m, mem);
       fflush(mem);
       fclose(mem);
-      fprintf(stdout, "@@@%s:%s", side, mv);
+      fprintf(stdout, "@@@%s", mv);
       fflush(stdout);
     }
     fprintf(stderr, "[ccheck] line 499\n"); // ming
@@ -639,7 +641,9 @@ static void game_loop(Board *bp, const Config *cfg) {
     apply(bp, m);
 
     // If the engine exists and this move was by its opponent, notify the engine
+    fprintf(stderr, "[ccheck] about to notify engine of opponent move\n");
     notify_engine_of_opponent_move(bp, p, cfg, m);
+    fprintf(stderr, "[ccheck] end of loop iteration\n");
   }
 }
 
